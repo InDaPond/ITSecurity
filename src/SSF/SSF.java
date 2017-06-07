@@ -67,10 +67,6 @@ public class SSF {
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
         cipher.init(Cipher.ENCRYPT_MODE, secretAESKey);
 
-<<<<<<< HEAD
-        byte[] encryptedData = cipher.doFinal(unencryptedDataBytes);
-        return encryptedData;
-=======
         // nun werden die Daten verschluesselt
         // (update wird bei grossen Datenmengen mehrfach aufgerufen werden!)
         byte[] encryptedData = cipher.update(unencryptedDataBytes);
@@ -78,7 +74,6 @@ public class SSF {
         byte [] restData = cipher.doFinal();
 
         return concatenate(encryptedData, restData);
->>>>>>> 8e328b6c88620f0988ac6a620014434a63a7b9a1
     }
 
     private SecretKey generateSecretKey() throws InvalidKeyException,

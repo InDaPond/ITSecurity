@@ -65,6 +65,9 @@ public class RSF {
         // der oeffentliche Schluessel
         inputStream.read(parameterBytes);
 
+
+
+        encryptedData = new byte[(int) file.length()];
         inputStream.read(encryptedData);
 
         // Datei schliessen
