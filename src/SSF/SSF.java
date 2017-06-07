@@ -87,6 +87,8 @@ public class SSF {
         return skey;
     }
 
+
+
     private byte[] createSignatureAndSign(Key key) throws NoSuchAlgorithmException, InvalidKeyException, SignatureException {
 
         // die Nachricht als Byte-Array
@@ -128,6 +130,8 @@ public class SSF {
 
         return concatenate(encData, encRest);
     }
+
+    
 
     private byte[] concatenate(byte[] ba1, byte[] ba2) {
         int len1 = ba1.length;
