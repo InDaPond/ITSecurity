@@ -100,8 +100,7 @@ public class CipherEncryption {
 		return allEncDataBytes;
 	}
 
-	public byte[] decryptData(byte[] cipherBytes, byte[] secretKeyBytes,
-			byte[] parameterBytes) throws NoSuchAlgorithmException,
+	public byte[] decryptData(byte[] cipherBytes, byte[] secretKeyBytes, byte[] parameterBytes) throws NoSuchAlgorithmException,
 			IOException, NoSuchPaddingException, InvalidKeyException,
 			InvalidAlgorithmParameterException, IllegalBlockSizeException,
 			BadPaddingException {

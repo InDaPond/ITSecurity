@@ -1,6 +1,7 @@
 package SSF;
 
 import RSAKeyCreation.RSAKeyReader;
+import sun.misc.IOUtils;
 
 import javax.crypto.*;
 import java.io.*;
@@ -12,66 +13,62 @@ import java.security.spec.InvalidKeySpecException;
  */
 public class SSF {
 
-    private String rsapubFile;
-    private String rsaprvFile;
+    private String publicRSAFile;
+    private String privateRSAFile;
     private PrivateKey prvRSAKey;
     private PublicKey pubRSAKey;
-    private SecretKey sKey;
+    private SecretKey secretAESKey;
 
-    public SSF(String rsapubFile, String rsaprvFile) {
-        this.rsapubFile = rsapubFile;
-        this.rsaprvFile = rsaprvFile;
+    public SSF(String publicRSAFile, String privateRSAFile) {
+        this.publicRSAFile = publicRSAFile;
+        this.privateRSAFile = privateRSAFile;
     }
-
-    public String getRsapubFile() {
-        return rsapubFile;
-    }
-
-    public String getRsaprvFile() {
-        return rsaprvFile;
-    }
-
-    public  PublicKey getPubRSAKey(){
-        return pubRSAKey;
-    }
-
-    public void setPrvRSAKey(PrivateKey key) {
-        this.prvRSAKey = key;
-    }
-
-    public void setPubRSAKey(PublicKey key) {
-        this.pubRSAKey = key;
-    }
-
-    public void setsKey(SecretKey key) {
-        this.sKey = key;
-    }
-
 
     public static void main(String[] args) throws InvalidKeySpecException, NoSuchAlgorithmException, InvalidKeyException, IOException, SignatureException, NoSuchPaddingException, BadPaddingException, IllegalBlockSizeException {
         SSF ssf = new SSF("Philipp.pub", "Philipp.prv");
         RSAKeyReader keyReader = new RSAKeyReader();
-        PrivateKey prvKey = keyReader.readPrivateKey(new File(ssf.getRsaprvFile()));
-        ssf.setPrvRSAKey(prvKey);
-        PublicKey pubKey = keyReader.readPublicKey(new File(ssf.getRsapubFile()));
-        ssf.setPubRSAKey(pubKey);
-        DataOutputStream os = new DataOutputStream(new FileOutputStream(new File("Output.ssf")));
-        SecretKey skey = ssf.generateSecretKey();
-        byte[] signature = ssf.createSignatureAndSign(skey);
-        byte[] encryptedWithRSA = ssf.encryptKeyWithRSA(skey);
-        os.writeInt(encryptedWithRSA.length);
-        os.write(encryptedWithRSA);
-        os.writeInt(signature.length);
-        os.write(signature);
-        String algorithm = skey.getAlgorithm();
-        os.write(algorithm.getBytes().length);
-        os.write(algorithm.getBytes());
+        PrivateKey privateKey = keyReader.readPrivateKey(new File(ssf.getPrivateRSAFile()));
+        ssf.setPrvRSAKey(privateKey);
+        PublicKey publicKey = keyReader.readPublicKey(new File(ssf.getPublicRSAFile()));
+        ssf.setPubRSAKey(publicKey);
+        SecretKey secretKey = ssf.generateSecretKey();
 
+        byte[] signature = ssf.createSignatureAndSign(secretKey);
+        byte[] encryptedKeyRSA = ssf.encryptKeyWithRSA(secretKey);
 
+        DataOutputStream outputStream = new DataOutputStream(new FileOutputStream(new File("Output.ssf")));
+        DataInputStream inputStream = new DataInputStream(new FileInputStream("Input.txt"));
 
+        outputStream.writeInt(encryptedKeyRSA.length);
+        outputStream.write(encryptedKeyRSA);
 
+        outputStream.writeInt(signature.length);
+        outputStream.write(signature);
+
+        String algorithm = secretKey.getAlgorithm();
+        outputStream.write(algorithm.getBytes().length);
+        outputStream.write(algorithm.getBytes());
+
+        byte[] encryptedData = ssf.encryptData(inputStream);
+
+        outputStream.write(encryptedData);
+        outputStream.flush();
+        outputStream.close();
     }
 
+
+    public byte[] encryptData(DataInputStream unencryptedData) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException, IOException {
+        byte[] unencryptedDataBytes = null;
+        unencryptedData.readFully(unencryptedDataBytes);
+        byte[] encryptedData = null;
+
+        Cipher cipher;
+        cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+        cipher.init(Cipher.ENCRYPT_MODE, secretAESKey);
+
+        encryptedData = cipher.doFinal(unencryptedDataBytes);
+        return encryptedData;
+    }
 
     public SecretKey generateSecretKey() throws InvalidKeyException,
             NoSuchAlgorithmException {
@@ -79,7 +76,7 @@ public class SSF {
         KeyGenerator kg = KeyGenerator.getInstance("AES");
         kg.init(128); // Schluessellaenge als Parameter
         SecretKey skey = kg.generateKey();
-        setsKey(skey);
+        setSecretAESKey(skey);
         // Ergebnis
         return skey;
     }
@@ -137,6 +134,30 @@ public class SSF {
         System.arraycopy(ba2, 0, result, len1, len2);
 
         return result;
+    }
+
+    public String getPublicRSAFile() {
+        return publicRSAFile;
+    }
+
+    public String getPrivateRSAFile() {
+        return privateRSAFile;
+    }
+
+    public PublicKey getPubRSAKey() {
+        return pubRSAKey;
+    }
+
+    public void setPubRSAKey(PublicKey key) {
+        this.pubRSAKey = key;
+    }
+
+    public void setPrvRSAKey(PrivateKey key) {
+        this.prvRSAKey = key;
+    }
+
+    public void setSecretAESKey(SecretKey key) {
+        this.secretAESKey = key;
     }
 
 
