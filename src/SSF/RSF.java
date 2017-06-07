@@ -4,9 +4,11 @@ import RSAKeyCreation.RSAKeyReader;
 
 import javax.crypto.*;
 import javax.crypto.spec.SecretKeySpec;
+import javax.xml.crypto.Data;
 import java.io.*;
 import java.security.*;
 import java.security.spec.InvalidKeySpecException;
+import java.security.spec.RSAPrivateKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 
 /**
@@ -35,6 +37,94 @@ public class RSF {
         rsf.readAndVerifySecureFile(new File("Output.ssf"));
     }
 
+    private byte[] readAndVerifySecureFile(File file) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException, SignatureException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException, NoSuchPaddingException {
+        byte[] encryptedSecretKey = null;
+        byte[] signatureBytes = null;
+        byte[] pubKeyBytes = null;
+        byte[] parameterBytes = null;
+        byte[] encryptedData = null;
+
+        DataInputStream inputStream = new DataInputStream(new FileInputStream(file));
+
+        int secretKeyLength = inputStream.readInt();
+        System.out.println("Laenge secretkey:" + secretKeyLength);
+        encryptedSecretKey = new byte[secretKeyLength];
+
+        inputStream.read(encryptedSecretKey);
+        System.out.println("encryptedSecretKey: " + new String(encryptedSecretKey));
+
+
+        // die Laenge der Signatur
+        int signatureLength = inputStream.readInt();
+        System.out.println("Laenge Signatur: " + signatureLength);
+        signatureBytes = new byte[signatureLength];
+
+        inputStream.read(signatureBytes);
+        System.out.println("Signatur in Bytes : " + new String(signatureBytes));
+
+
+        // die Laenge der alg. Parameter
+        int parameterLength = inputStream.readInt();
+        System.out.println("Laenge alg Params: " + parameterLength);
+        parameterBytes = new byte[parameterLength];
+
+        inputStream.read(parameterBytes);
+        System.out.println("Parameter in Bytes : " + new String(parameterBytes));
+
+
+        encryptedData = new byte[(int) file.length()];
+
+        inputStream.read(encryptedData);
+        System.out.println("Encrypted Data: " + new String(encryptedData));
+
+
+        inputStream.close();
+
+        byte[] decData = decrypt(encryptedSecretKey, privateRSAKey, parameterBytes, encryptedData);
+
+        return decData;
+
+    }
+
+    public byte[] decrypt(byte[] secretKeyBytes, Key key, byte[] parameterBytes, byte[] encryptedDataBytes) throws NoSuchAlgorithmException,
+            IOException, NoSuchPaddingException, InvalidKeyException,
+            InvalidAlgorithmParameterException, IllegalBlockSizeException,
+            BadPaddingException {
+
+        Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+
+        cipher.init(Cipher.DECRYPT_MODE, key);
+        byte[] rsaEncData = cipher.update(secretKeyBytes);
+
+        byte[] decRest = cipher.doFinal();
+
+        byte[] allSecretKeyDecDataBytes = concatenate(rsaEncData,decRest);
+
+        System.out.println("Ergebnis:" + new String(allSecretKeyDecDataBytes) + allSecretKeyDecDataBytes.length);
+
+        SecretKeySpec skspec = new SecretKeySpec(allSecretKeyDecDataBytes, "AES");
+        cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+
+        // Algorithmische Parameter aus Parameterbytes ermitteln (z.B. IV)TODO: können wir nicht
+        AlgorithmParameters algorithmParms = AlgorithmParameters
+                .getInstance("AES");
+        algorithmParms.init(parameterBytes);
+
+        System.out.println("hier stirbt er : " + new String(parameterBytes));
+
+        cipher.init(Cipher.DECRYPT_MODE, skspec, algorithmParms); //ToDO: Mit Alg Params geht es nicht
+
+             byte[] decData = cipher.update(encryptedDataBytes);
+
+        decRest = cipher.doFinal();
+
+        byte[] allDecDataBytes = concatenate(decData, decRest);
+
+        DataOutputStream outputStream = new DataOutputStream(new FileOutputStream(new File("decData.txt")));
+        return allDecDataBytes;
+
+    }
+
     public static PrivateKey getPrivateKey() {
         return privateRSAKey;
     }
@@ -49,149 +139,6 @@ public class RSF {
 
     public static void setPublicKey(PublicKey publicKey) {
         RSF.publicRSAKey = publicKey;
-    }
-
-    private String readAndVerifySecureFile(File file) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException, SignatureException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException, NoSuchPaddingException {
-        byte[] encryptedSecretKey = null;
-        byte[] signatureBytes = null;
-        byte[] pubKeyBytes = null;
-        byte[] parameterBytes = null;
-        byte[] encryptedData = null;
-
-        // die Datei wird geoeffnet und die Daten gelesen
-        DataInputStream inputStream = new DataInputStream(new FileInputStream(file));
-
-
-        // die Laenge der Nachricht
-        int secretKeyLength = inputStream.readInt();
-        encryptedSecretKey = new byte[secretKeyLength];
-        // die Nachricht
-        inputStream.read(encryptedSecretKey);
-
-
-        // die Laenge der Signatur
-        int signatureLength = inputStream.readInt();
-        signatureBytes = new byte[signatureLength];
-        // die Signatur
-        inputStream.read(signatureBytes);
-
-
-        // die Laenge des oeffentlichen Schluessels
-        int parameterLength = inputStream.readInt();
-        parameterBytes = new byte[parameterLength];
-        // der oeffentliche Schluessel
-        inputStream.read(parameterBytes);
-
-
-        encryptedData = new byte[(int) file.length()];
-        inputStream.read(encryptedData);
-
-        // Datei schliessen
-        inputStream.close();
-
-        SecretKey aesSecretKey = decryptSecretKey(encryptedSecretKey, privateRSAKey);
-
-        byte[] aesSecretKeyBytes = aesSecretKey.getEncoded();
-
-        byte[] decryptedData = decryptData(encryptedData, aesSecretKeyBytes, parameterBytes);
-
-        // aus dem Byte-Array koennen wir eine X.509-Schluesselspezifikation
-        // erzeugen
-        X509EncodedKeySpec x509KeySpec = new X509EncodedKeySpec(pubKeyBytes);
-
-        // nun wird aus der Spezifikation wieder abgeschlossener public key
-        // erzeugt
-        KeyFactory keyFac = KeyFactory.getInstance("RSA");
-        PublicKey pubKey = keyFac.generatePublic(x509KeySpec);
-
-        // Nun wird die Signatur ueberprueft
-        // als Erstes erzeugen wir das Signatur-Objekt
-        Signature rsaSig = Signature.getInstance("SHA256withRSA");
-        // zum Verifizieren benoetigen wir den oeffentlichen Schluessel
-        rsaSig.initVerify(pubKey);
-        // Daten fuer die kryptographische Hashfunktion (hier: SHA-256)
-        // liefern
-        rsaSig.update(encryptedData);
-
-        // Signatur verifizieren:
-        // 1. Verschluesselung der Signatur (mit oeffentlichem
-        // RSA-Schluessel)
-        // 2. Pr�fung: Ergebnis aus 1. == kryptogr. Hashwert der messageBytes?
-        boolean ok = rsaSig.verify(signatureBytes);
-        if (ok)
-            System.out.println("Signatur erfolgreich verifiziert!");
-        else
-            System.out.println("Signatur konnte nicht verifiziert werden!");
-
-
-        // als Ergebnis liefern wir die urpspruengliche Nachricht
-        return new String(encryptedData);
-
-
-    }
-
-//    public SecretKey decryptSecretKey(byte[] encryptedKey, PrivateKey privateKey) throws InvalidKeyException, NoSuchPaddingException, NoSuchAlgorithmException, BadPaddingException, IllegalBlockSizeException {
-//        // Cipher-Objekt erzeugen und initialisieren mit AES-Algorithmus und
-//        // Parametern (z.B. IV-Erzeugung)
-//        // SUN-Default ist ECB-Modus (damit kein IV uebergeben werden muss)
-//        // und PKCS5Padding
-//        Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-//
-//        // Initialisierung zur Verschluesselung mit automatischer
-//        // Parametererzeugung
-//        cipher.init(Cipher.DECRYPT_MODE, privateKey);
-//
-//        //Todo stimmt das so?s
-//        byte[] decSkeyByte = cipher.doFinal(encryptedKey);
-//        SecretKey decSkey = new SecretKeySpec(decSkeyByte, "AES");
-//        System.out.println(decSkey);
-//        return decSkey;
-//    }
-
-    public SecretKey decryptSecretKey(byte[] encryptedKey, PrivateKey privateKey) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
-        Cipher cipher;
-        byte[] decryptedData = null;
-        cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-        cipher.init(Cipher.DECRYPT_MODE, privateKey);
-        decryptedData = cipher.doFinal(encryptedKey);
-        SecretKey decSkey = new SecretKeySpec(decryptedData, "AES");
-        return decSkey;
-    }
-
-
-    public byte[] decryptData(byte[] cipherBytes, byte[] secretKeyBytes, byte[] parameterBytes) throws NoSuchAlgorithmException,
-            IOException, NoSuchPaddingException, InvalidKeyException,
-            InvalidAlgorithmParameterException, IllegalBlockSizeException,
-            BadPaddingException {
-        // Datenbytes entschluesseln
-
-        // Zuerst muss aus der Bytefolge eine neue AES-Schluesselspezifikation
-        // erzeugt werden (transparenter Schluessel)
-        SecretKeySpec skspec = new SecretKeySpec(secretKeyBytes, "AES");
-
-        // Algorithmische Parameter aus Parameterbytes ermitteln (z.B. IV)
-        AlgorithmParameters algorithmParms = AlgorithmParameters
-                .getInstance("AES");
-
-        algorithmParms.init(parameterBytes);
-
-        // Cipher-Objekt zur Entschluesselung erzeugen
-        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-
-        // mit diesem Schluessel wird nun die AES-Chiffre im DECRYPT MODE
-        // initialisiert (inkl. AlgorithmParameters fuer den IV)
-        cipher.init(Cipher.DECRYPT_MODE, skspec, algorithmParms);
-
-        // und die Daten entschluesselt
-        byte[] decData = cipher.update(cipherBytes);
-
-        // mit doFinal abschliessen (Rest inkl. Padding ..)
-        byte[] decRest = cipher.doFinal();
-
-        byte[] allDecDataBytes = concatenate(decData, decRest);
-
-        // Rueckgabe: die entschluesselten Klartextbytes
-        return allDecDataBytes;
     }
 
     public String getPrivateRSAFile() {
@@ -221,13 +168,5 @@ public class RSF {
         System.arraycopy(ba2, 0, result, len1, len2);
 
         return result;
-    }
-
-    public static PrivateKey getPrivateRSAKey() {
-        return privateRSAKey;
-    }
-
-    public static PublicKey getPublicRSAKey() {
-        return publicRSAKey;
     }
 }

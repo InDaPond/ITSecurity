@@ -37,21 +37,27 @@ public class SSF {
 
         DataOutputStream outputStream = new DataOutputStream(new FileOutputStream(new File("Output.ssf")));
 
-
+        System.out.println("Laenge encryptedKey: " + encryptedKeyRSA.length);
         outputStream.writeInt(encryptedKeyRSA.length);
+        System.out.println(" encryptedKey: " + encryptedKeyRSA.toString());
         outputStream.write(encryptedKeyRSA);
 
+        System.out.println("Laenge Signature: " + signature.length);
         outputStream.writeInt(signature.length);
+        System.out.println("Signature: " + signature.toString());
         outputStream.write(signature);
 
         String algorithm = secretKey.getAlgorithm();
-        outputStream.write(algorithm.getBytes().length);
-        outputStream.write(algorithm.getBytes());
-
+        byte[] algParams = ssf.concatenate(algorithm.getBytes(),secretKey.getEncoded());
+        outputStream.writeInt(algParams.length);
+        System.out.println("Algorithm Laenge : " + algParams.length);
+        outputStream.write(algParams);
+        System.out.println("Alg Params: " + new String(algParams));
 
         byte[] encryptedData = ssf.encryptData(new File("Input.txt"));
 
-
+        System.out.println("encryptedData: " + new String(encryptedData));
+        System.out.println("?");
         outputStream.write(encryptedData);
         outputStream.flush();
         outputStream.close();
@@ -67,18 +73,15 @@ public class SSF {
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
         cipher.init(Cipher.ENCRYPT_MODE, secretAESKey);
 
-        // nun werden die Daten verschluesselt
-        // (update wird bei grossen Datenmengen mehrfach aufgerufen werden!)
         byte[] encryptedData = cipher.update(unencryptedDataBytes);
 
-        byte [] restData = cipher.doFinal();
+        byte[] restData = cipher.doFinal();
 
         return concatenate(encryptedData, restData);
     }
 
     private SecretKey generateSecretKey() throws InvalidKeyException,
             NoSuchAlgorithmException {
-        // AES-Schluessel generieren
         KeyGenerator kg = KeyGenerator.getInstance("AES");
         kg.init(128); // Schluessellaenge als Parameter
         SecretKey skey = kg.generateKey();
@@ -87,60 +90,38 @@ public class SSF {
         return skey;
     }
 
-
-
     private byte[] createSignatureAndSign(Key key) throws NoSuchAlgorithmException, InvalidKeyException, SignatureException {
-
-        // die Nachricht als Byte-Array
 
         byte[] KeyBytes = key.getEncoded();
         Signature rsaSignature = null;
         byte[] signatureBytes = null;
 
-        // als Erstes erzeugen wir das Signatur-Objekt
         rsaSignature = Signature.getInstance("SHA256withRSA");
-        // zum Signieren benoetigen wir den privaten Schluessel (hier: RSA)
         rsaSignature.initSign(prvRSAKey);
-        // Daten fuer die kryptographische Hashfunktion (hier: SHA-256)
-        // liefern
         rsaSignature.update(KeyBytes);
-        // Signaturbytes durch Verschluesselung des Hashwerts (mit privatem
-        // RSA-Schluessel) erzeugen
         return rsaSignature.sign();
 
     }
 
     private byte[] encryptKeyWithRSA(Key key) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
-        // Cipher-Objekt erzeugen und initialisieren mit AES-Algorithmus und
-        // Parametern (z.B. IV-Erzeugung)
-        // SUN-Default ist ECB-Modus (damit kein IV uebergeben werden muss)
-        // und PKCS5Padding
+
         Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
 
-        // Initialisierung zur Verschluesselung mit automatischer
-        // Parametererzeugung
         cipher.init(Cipher.ENCRYPT_MODE, getPubRSAKey());
 
-        // nun werden die Daten verschluesselt
-        // (update wird bei grossen Datenmengen mehrfach aufgerufen werden!)
         byte[] encData = cipher.update(key.getEncoded());
 
-        // mit doFinal abschliessen (Rest inkl. Padding ..)
         byte[] encRest = cipher.doFinal();
 
         return concatenate(encData, encRest);
     }
-
-    
 
     private byte[] concatenate(byte[] ba1, byte[] ba2) {
         int len1 = ba1.length;
         int len2 = ba2.length;
         byte[] result = new byte[len1 + len2];
 
-        // Fill with first array
         System.arraycopy(ba1, 0, result, 0, len1);
-        // Fill with second array
         System.arraycopy(ba2, 0, result, len1, len2);
 
         return result;
