@@ -65,7 +65,7 @@ public class SSF {
         cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
         cipher.init(Cipher.ENCRYPT_MODE, secretAESKey);
 
-        byte [] encryptedData = cipher.doFinal(unencryptedDataBytes);
+        byte[] encryptedData = cipher.doFinal(unencryptedDataBytes);
         return encryptedData;
     }
 
