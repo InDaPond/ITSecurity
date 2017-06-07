@@ -57,20 +57,19 @@ public class SSF {
     }
 
 
-    public byte[] encryptData(DataInputStream unencryptedData) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException, IOException {
+    private byte[] encryptData(DataInputStream unencryptedData) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException, IOException {
         byte[] unencryptedDataBytes = null;
         unencryptedData.readFully(unencryptedDataBytes);
-        byte[] encryptedData = null;
 
         Cipher cipher;
         cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
         cipher.init(Cipher.ENCRYPT_MODE, secretAESKey);
 
-        encryptedData = cipher.doFinal(unencryptedDataBytes);
+        byte [] encryptedData = cipher.doFinal(unencryptedDataBytes);
         return encryptedData;
     }
 
-    public SecretKey generateSecretKey() throws InvalidKeyException,
+    private SecretKey generateSecretKey() throws InvalidKeyException,
             NoSuchAlgorithmException {
         // AES-Schluessel generieren
         KeyGenerator kg = KeyGenerator.getInstance("AES");
@@ -81,7 +80,7 @@ public class SSF {
         return skey;
     }
 
-    public byte[] createSignatureAndSign(Key key) throws NoSuchAlgorithmException, InvalidKeyException, SignatureException {
+    private byte[] createSignatureAndSign(Key key) throws NoSuchAlgorithmException, InvalidKeyException, SignatureException {
 
         // die Nachricht als Byte-Array
 
@@ -102,7 +101,7 @@ public class SSF {
 
     }
 
-    public byte[] encryptKeyWithRSA(Key key) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
+    private byte[] encryptKeyWithRSA(Key key) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException {
         // Cipher-Objekt erzeugen und initialisieren mit AES-Algorithmus und
         // Parametern (z.B. IV-Erzeugung)
         // SUN-Default ist ECB-Modus (damit kein IV uebergeben werden muss)
@@ -134,6 +133,13 @@ public class SSF {
         System.arraycopy(ba2, 0, result, len1, len2);
 
         return result;
+    }
+
+    private byte[] getAlgorithmParameter(SecretKey secretAESKey) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, IOException {
+        Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+        cipher.init(Cipher.ENCRYPT_MODE, secretAESKey);
+        byte[] algorithmParameter = cipher.getParameters().getEncoded();
+        return algorithmParameter;
     }
 
     public String getPublicRSAFile() {
