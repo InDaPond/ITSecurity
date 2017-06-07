@@ -1,7 +1,6 @@
 package SSF;
 
 import RSAKeyCreation.RSAKeyReader;
-import sun.misc.IOUtils;
 
 import javax.crypto.*;
 import java.io.*;
@@ -37,7 +36,7 @@ public class SSF {
         byte[] encryptedKeyRSA = ssf.encryptKeyWithRSA(secretKey);
 
         DataOutputStream outputStream = new DataOutputStream(new FileOutputStream(new File("Output.ssf")));
-        DataInputStream inputStream = new DataInputStream(new FileInputStream("Input.txt"));
+
 
         outputStream.writeInt(encryptedKeyRSA.length);
         outputStream.write(encryptedKeyRSA);
@@ -49,7 +48,9 @@ public class SSF {
         outputStream.write(algorithm.getBytes().length);
         outputStream.write(algorithm.getBytes());
 
-        byte[] encryptedData = ssf.encryptData(inputStream);
+
+        byte[] encryptedData = ssf.encryptData(new File("Input.txt"));
+
 
         outputStream.write(encryptedData);
         outputStream.flush();
@@ -57,16 +58,27 @@ public class SSF {
     }
 
 
-    private byte[] encryptData(DataInputStream unencryptedData) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException, IOException {
-        byte[] unencryptedDataBytes = null;
-        unencryptedData.readFully(unencryptedDataBytes);
+    private byte[] encryptData(File file) throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, BadPaddingException, IllegalBlockSizeException, IOException {
+        DataInputStream inputStream = new DataInputStream(new FileInputStream(file));
+        byte[] unencryptedDataBytes = new byte[(int) file.length()];
+        inputStream.readFully(unencryptedDataBytes);
 
-        Cipher cipher;
-        cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
         cipher.init(Cipher.ENCRYPT_MODE, secretAESKey);
 
+<<<<<<< HEAD
         byte[] encryptedData = cipher.doFinal(unencryptedDataBytes);
         return encryptedData;
+=======
+        // nun werden die Daten verschluesselt
+        // (update wird bei grossen Datenmengen mehrfach aufgerufen werden!)
+        byte[] encryptedData = cipher.update(unencryptedDataBytes);
+
+        byte [] restData = cipher.doFinal();
+
+        return concatenate(encryptedData, restData);
+>>>>>>> 8e328b6c88620f0988ac6a620014434a63a7b9a1
     }
 
     private SecretKey generateSecretKey() throws InvalidKeyException,
