@@ -69,4 +69,40 @@ public class RSAKeyReader {
 
         return key;
     }
+
+    public static PrivateKey loadPrivKey(String filename) throws Exception {
+        File inputFile = new File(filename);
+        FileInputStream fileInputStream = new FileInputStream(inputFile);
+        DataInputStream dataInputStream = new DataInputStream((fileInputStream));
+
+        int nameLength = dataInputStream.readInt();
+        byte[] name = new byte[nameLength];
+        dataInputStream.read(name);
+
+        int keyLength = dataInputStream.readInt();
+        byte[] key = new byte[keyLength];
+        dataInputStream.read(key);
+
+        PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(key);
+        KeyFactory kf = KeyFactory.getInstance("RSA");
+        return kf.generatePrivate(spec);
+    }
+
+    public static PublicKey loadPubKey(String filename) throws Exception {
+        File inputFile = new File(filename);
+        FileInputStream fileInputStream = new FileInputStream(inputFile);
+        DataInputStream dataInputStream = new DataInputStream((fileInputStream));
+
+        int nameLength = dataInputStream.readInt();
+        byte[] name = new byte[nameLength];
+        dataInputStream.read(name);
+
+        int keyLength = dataInputStream.readInt();
+        byte[] key = new byte[keyLength];
+        dataInputStream.read(key);
+
+        X509EncodedKeySpec spec = new X509EncodedKeySpec(key);
+        KeyFactory kf = KeyFactory.getInstance("RSA");
+        return kf.generatePublic(spec);
+    }
 }

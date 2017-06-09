@@ -15,149 +15,118 @@ import java.security.spec.X509EncodedKeySpec;
  * Created by alena on 07.06.2017.
  */
 public class RSF {
+    /**
+    java RSF FMeier.prv KMueller.pub Brief.ssf Brief.pdf
+    */
+    public static void main(String[] args) throws Exception {
+        String privateKeyFile = args[0];
+        String publicKeyFile = args[1];
+        String inputFile = args[2];
+        String outputFile = args[3];
 
-    private static PublicKey publicRSAKey;
-    private static PrivateKey privateRSAKey;
-    private String publicRSAFile;
-    private String privateRSAFile;
-
-    public RSF(String publicRSAFile, String privateRSAFile) {
-        this.publicRSAFile = publicRSAFile;
-        this.privateRSAFile = privateRSAFile;
+        new RSF(privateKeyFile,publicKeyFile,inputFile,outputFile);
     }
 
-    public static void main(String args[]) throws InvalidKeySpecException, SignatureException, NoSuchAlgorithmException, InvalidKeyException, IOException, NoSuchPaddingException, BadPaddingException, InvalidAlgorithmParameterException, IllegalBlockSizeException {
-        RSF rsf = new RSF("Philipp.pub", "Philipp.prv");
-        RSAKeyReader keyReader = new RSAKeyReader();
-        PrivateKey privateKey = keyReader.readPrivateKey(new File(rsf.getPrivateRSAFile()));
-        rsf.setPrivateKey(privateKey);
-        PublicKey publicKey = keyReader.readPublicKey(new File(rsf.getPublicRSAFile()));
-        rsf.setPublicKey(publicKey);
+    public RSF(String privKeyFile, String pubKeyFile, String input, String output) throws Exception {
+        PrivateKey privateKey = null;
+        PublicKey publicKey = null;
+            RSAKeyReader keyReader = new RSAKeyReader();
 
-        rsf.readAndVerifySecureFile(new File("Output.ssf"));
+            /**
+            a) Einlesen eines öffentlichen RSA‐Schlüssels aus einer Datei gemäß Aufgabenteil 1. 
+            */
+            privateKey = keyReader.loadPrivKey(privKeyFile);
+
+            /**
+            b) Einlesen eines privaten RSA‐Schlüssels aus einer Datei gemäß Aufgabenteil 1. 
+            */
+            publicKey = keyReader.loadPubKey(pubKeyFile);
+
+            /**
+            c) Einlesen einer .ssf‐Datei gemäß Aufgabenteil 2, Entschlüsselung des geheimen Schlüssels mit 
+            dem privaten RSA‐Schlüssel
+            */
+            File inputFile = new File(input);
+            FileInputStream fileInputStream = new FileInputStream(inputFile);
+            DataInputStream dataInputStream = new DataInputStream((fileInputStream));
+
+            /**
+            Schlüssel auslesen
+            */
+            int keyLength = dataInputStream.readInt();
+            byte[] aesKey = new byte[keyLength];
+            dataInputStream.read(aesKey);
+
+            /**
+             Signatur auslesen
+            */
+            int signatureLength =  dataInputStream.readInt();
+            byte[] signatureBytes = new byte[signatureLength];
+            dataInputStream.read(signatureBytes);
+
+            /**
+             Algorithmus Parameter auslesen
+            */
+            int rsaParamsLength = dataInputStream.readInt();
+            byte[] rsaParams = new byte[rsaParamsLength];
+            dataInputStream.read(rsaParams);
+
+            Cipher cipher = Cipher.getInstance("RSA");
+            cipher.init(Cipher.DECRYPT_MODE,privateKey);
+            byte[] decryptedAesKey = cipher.doFinal(aesKey);
+
+            /**
+            Entschlüsselung der Dateidaten mit dem geheimen Schlüssel (AES im Counter‐Mode) – mit Anwendung der übermittelten algorithmischen Parameter – sowie 
+            Erzeugung einer Klartext‐Ausgabedatei.*/
+            SecretKeySpec skspec = new SecretKeySpec(decryptedAesKey, "AES");
+
+            /**
+              mit Anwendung der übermittelten algorithmischen Parameter
+            */
+            AlgorithmParameters algorithmParms = AlgorithmParameters
+                    .getInstance("AES");
+            algorithmParms.init(rsaParams);
+
+            Cipher inputCipher = Cipher.getInstance("AES/CTR/PKCS5Padding");
+            inputCipher.init(Cipher.DECRYPT_MODE,skspec,algorithmParms);
+
+            byte[] readInput = new byte[8];
+            int len;
+            byte[] inputCipherFile = new byte[0];
+            while ((len = fileInputStream.read(readInput)) > 0) {
+                inputCipherFile = concatenate(inputCipherFile,inputCipher.update(readInput.clone()));
+            }
+            byte[] inputCipherFinal = inputCipher.doFinal();
+
+            /**
+             Erzeugung einer Klartext‐Ausgabedatei. 
+            */
+            File outputFile = new File(output);
+            FileOutputStream fileOutputStream = new FileOutputStream(outputFile);
+            DataOutputStream dataOutputStream = new DataOutputStream(fileOutputStream);
+            dataOutputStream.write(inputCipherFile);
+
+            dataInputStream.close();
+            dataOutputStream.close();
+
+            /**
+            d) Überprüfung der Signatur für den geheimen Schlüssel aus c) mit dem öffentlichen RSA‐Schlüssel 
+            (Algorithmus: „SHA256withRSA“) 
+            */
+            Signature signature = Signature.getInstance("SHA256withRSA");
+            signature.initVerify(publicKey);
+
+            /**
+            // Echter AES Key, der auch verschlüsselt wurde
+            */
+            signature.update(decryptedAesKey);
+            if(signature.verify(signatureBytes)){
+                System.out.println("Signature Verified");
+            } else {
+                System.out.println("Signature could not be verified");
+            }
     }
-
-    private byte[] readAndVerifySecureFile(File file) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException, InvalidKeyException, SignatureException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException, NoSuchPaddingException {
-        byte[] encryptedSecretKey = null;
-        byte[] signatureBytes = null;
-        byte[] pubKeyBytes = null;
-        byte[] parameterBytes = null;
-        byte[] encryptedData = null;
-
-        DataInputStream inputStream = new DataInputStream(new FileInputStream(file));
-
-        int secretKeyLength = inputStream.readInt();
-        System.out.println("Laenge secretkey:" + secretKeyLength);
-        encryptedSecretKey = new byte[secretKeyLength];
-
-        inputStream.read(encryptedSecretKey);
-        System.out.println("encryptedSecretKey: " + new String(encryptedSecretKey));
-
-
-        // die Laenge der Signatur
-        int signatureLength = inputStream.readInt();
-        System.out.println("Laenge Signatur: " + signatureLength);
-        signatureBytes = new byte[signatureLength];
-
-        inputStream.read(signatureBytes);
-        System.out.println("Signatur in Bytes : " + new String(signatureBytes));
-
-
-        // die Laenge der alg. Parameter
-        int parameterLength = inputStream.readInt();
-        System.out.println("Laenge alg Params: " + parameterLength);
-        parameterBytes = new byte[parameterLength];
-
-        inputStream.read(parameterBytes);
-        System.out.println("Parameter in Bytes : " + new String(parameterBytes));
-
-
-        encryptedData = new byte[(int) file.length()];
-
-        inputStream.read(encryptedData);
-        System.out.println("Encrypted Data: " + new String(encryptedData));
-
-
-        inputStream.close();
-
-        byte[] decData = decrypt(encryptedSecretKey, privateRSAKey, parameterBytes, encryptedData);
-
-        return decData;
-
-    }
-
-    public byte[] decrypt(byte[] secretKeyBytes, Key key, byte[] parameterBytes, byte[] encryptedDataBytes) throws NoSuchAlgorithmException,
-            IOException, NoSuchPaddingException, InvalidKeyException,
-            InvalidAlgorithmParameterException, IllegalBlockSizeException,
-            BadPaddingException {
-
-        Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-
-        cipher.init(Cipher.DECRYPT_MODE, key);
-        byte[] rsaEncData = cipher.update(secretKeyBytes);
-
-        byte[] decRest = cipher.doFinal();
-
-        byte[] allSecretKeyDecDataBytes = concatenate(rsaEncData,decRest);
-
-        System.out.println("Ergebnis:" + new String(allSecretKeyDecDataBytes) + allSecretKeyDecDataBytes.length);
-
-        SecretKeySpec skspec = new SecretKeySpec(allSecretKeyDecDataBytes, "AES");
-        cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-
-        // Algorithmische Parameter aus Parameterbytes ermitteln (z.B. IV)TODO: können wir nicht
-        AlgorithmParameters algorithmParms = AlgorithmParameters
-                .getInstance("AES");
-        algorithmParms.init(parameterBytes);
-
-        System.out.println("hier stirbt er : " + new String(parameterBytes));
-
-        cipher.init(Cipher.DECRYPT_MODE, skspec, algorithmParms); //ToDO: Mit Alg Params geht es nicht
-
-             byte[] decData = cipher.update(encryptedDataBytes);
-
-        decRest = cipher.doFinal();
-
-        byte[] allDecDataBytes = concatenate(decData, decRest);
-
-        DataOutputStream outputStream = new DataOutputStream(new FileOutputStream(new File("decData.txt")));
-        return allDecDataBytes;
-
-    }
-
-    public static PrivateKey getPrivateKey() {
-        return privateRSAKey;
-    }
-
-    public static void setPrivateKey(PrivateKey privateKey) {
-        RSF.privateRSAKey = privateKey;
-    }
-
-    public static PublicKey getPublicKey() {
-        return publicRSAKey;
-    }
-
-    public static void setPublicKey(PublicKey publicKey) {
-        RSF.publicRSAKey = publicKey;
-    }
-
-    public String getPrivateRSAFile() {
-        return privateRSAFile;
-    }
-
-    public void setPrivateRSAFile(String privateRSAFile) {
-        this.privateRSAFile = privateRSAFile;
-    }
-
-    public String getPublicRSAFile() {
-        return publicRSAFile;
-    }
-
-    public void setPublicRSAFile(String publicRSAFile) {
-        this.publicRSAFile = publicRSAFile;
-    }
-
-    private byte[] concatenate(byte[] ba1, byte[] ba2) {
+    public static byte[] concatenate(byte[] ba1, byte[] ba2) {
         int len1 = ba1.length;
         int len2 = ba2.length;
         byte[] result = new byte[len1 + len2];

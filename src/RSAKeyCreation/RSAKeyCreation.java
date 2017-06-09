@@ -1,26 +1,79 @@
 package RSAKeyCreation;
 
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.NoSuchAlgorithmException;
+import java.io.*;
+import java.security.*;
 
 public class RSAKeyCreation {
     private final static int KEY_SIZE = 2048;
     private final static String KEY_ALGORITHM = "RSA";
 
-    public static void main(String[] args) throws NoSuchAlgorithmException, IOException {
-        if (args.length != 1)
-            throw new IllegalArgumentException();
+   // public static void main(String[] args) throws NoSuchAlgorithmException, IOException {
+//        if (args.length != 1)
+//            throw new IllegalArgumentException();
+//
+//        RSAKeyCreation.createKeyPair(args[0]);
+//
+//        System.out.println("Schluessel wurden erzeugt fuer " + args[0]);
+//
+//    }
 
-        RSAKeyCreation.createKeyPair(args[0]);
+        public static void main(String args[]){
+            if(args.length != 1) {
+                System.out.println("Usage: RSAKeyCreation <Wanted name for the key files>");
+            }
 
-        System.out.println("Schluessel wurden erzeugt fuer " + args[0]);
+            String filename = args[0];
+            new RSAKeyCreation(filename);
+        }
 
-    }
+        private File publicKey;
+        private File privateKey;
+
+    public RSAKeyCreation(String name){
+            this.publicKey = new File(System.getProperty("user.dir")+ "\\src\\" + name + ".pub");
+            this.privateKey = new File(System.getProperty("user.dir")+ "\\src\\" + name + ".prv");
+
+            Key pub = null;
+            Key priv = null;
+
+            try {
+                KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
+                SecureRandom random = new SecureRandom();
+                keyGen.initialize(2048, random);
+                KeyPair kp = keyGen.generateKeyPair();
+                pub = kp.getPublic();
+                priv = kp.getPrivate();
+            } catch (NoSuchAlgorithmException e) {
+                e.printStackTrace();
+            }
+            createKeyFile(name,pub, ".pub");
+            createKeyFile(name,priv,".prv");
+        }
+
+
+        private void createKeyFile(String name, Key key, String ending) {
+            // OutputStream to write to File
+            FileOutputStream outputStream = null;
+            File file = new File(System.getProperty("user.dir")+ "\\src\\" + name + ending);
+            try {
+                outputStream = new FileOutputStream(file);
+                DataOutputStream dataOutputStream = new DataOutputStream(outputStream);
+                // Length of user name
+                dataOutputStream.writeInt(name.length());
+                // Name
+                dataOutputStream.write(name.getBytes(),0,name.length());
+                // Length of public key
+                dataOutputStream.writeInt(key.getEncoded().length);
+                // PublicKey
+                dataOutputStream.write(key.getEncoded(),0,key.getEncoded().length);
+                dataOutputStream.close();
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+        }
 
     public static void createKeyPair(String owner) throws IOException, NoSuchAlgorithmException {
         KeyPairGenerator generator = KeyPairGenerator.getInstance(KEY_ALGORITHM);

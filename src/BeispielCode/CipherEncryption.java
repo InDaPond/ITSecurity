@@ -33,7 +33,7 @@ public class CipherEncryption {
 			Cipher cipher = generateCipher(sKey);
 
 			// Cipher-Objekt zur Verschluesselung von Daten verwenden
-			byte[] cipherBytes = encryptData("Das ist nur ein Test.Test!!", cipher);
+			byte[] cipherBytes = encryptData("Das ist nur ein SSF.Test!!", cipher);
 			System.out.println("Verschluesselte Daten: "
 					+ new String(cipherBytes));
 
